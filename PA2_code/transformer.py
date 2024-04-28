@@ -27,7 +27,6 @@ class Head(nn.Module):
         # compute attention scores ("affinities")
         wei = q @ k.transpose(-2,-1) * k.shape[-1]**-0.5 # (B, T, hs) @ (B, hs, T) -> (B, T, T)
         
-        # uncomment below if DECODING
         if self.decoding:
             wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf')) # (B, T, T)
         
@@ -109,31 +108,26 @@ class Encoder(nn.Module):
         self.position_embedding_table = nn.Embedding(block_size, n_embd)
         self.blocks = nn.Sequential(*[Block(n_embd, n_head=n_head, decoding=False) for _ in range(n_layer)])
         self.ln_f = nn.LayerNorm(n_embd) # final layer norm
-        self.lm_head = Classifier(input_size=n_embd, hidden_size=n_hidden)
-
-    #     # better init, not covered in the original GPT video, but important, will cover in followup video
-    #     self.apply(self._init_weights)
-
-    # def _init_weights(self, module):
-    #     if isinstance(module, nn.Linear):
-    #         torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
-    #         if module.bias is not None:
-    #             torch.nn.init.zeros_(module.bias)
-    #     elif isinstance(module, nn.Embedding):
-    #         torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+        self.classifier = Classifier(input_size=n_embd, hidden_size=n_hidden)
 
     def forward(self, idx, device, targets=None):
         B, T = idx.shape
+        # print("Batch Size:", B, ", Context Len:", T)
 
         # idx and targets are both (B,T) tensor of integers
         tok_emb = self.token_embedding_table(idx) # (B,T,C)
         pos_emb = self.position_embedding_table(torch.arange(T, device=device)) # (T,C)
         x = tok_emb + pos_emb # (B,T,C)
+        
         x = self.blocks(x) # (B,T,C)
         x = self.ln_f(x) # (B,T,C)
         
+        x = torch.mean(x, dim=1)
+        
         # need to pass in the MEAN of the embeddings along the SEQUENCE dimension
-        return self.lm_head(x) # (B,T,vocab_size)
+        # print("x Tensor Shape: ", x.shape)
+        
+        return self.classifier(x) # (B,T,vocab_size)
 
         # if targets is None:
         #     loss = None
@@ -155,23 +149,13 @@ class Decoder(nn.Module):
         self.ln_f = nn.LayerNorm(n_embd) # final layer norm
         self.lm_head = nn.Linear(n_embd, vocab_size)
 
-    #     # better init, not covered in the original GPT video, but important, will cover in followup video
-    #     self.apply(self._init_weights)
-
-    # def _init_weights(self, module):
-    #     if isinstance(module, nn.Linear):
-    #         torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
-    #         if module.bias is not None:
-    #             torch.nn.init.zeros_(module.bias)
-    #     elif isinstance(module, nn.Embedding):
-    #         torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
-
-    def forward(self, idx, targets=None):
+    def forward(self, idx, device, targets=None):
         B, T = idx.shape
 
         # idx and targets are both (B,T) tensor of integers
         tok_emb = self.token_embedding_table(idx) # (B,T,C)
         pos_emb = self.position_embedding_table(torch.arange(T, device=device)) # (T,C)
+        
         x = tok_emb + pos_emb # (B,T,C)
         x = self.blocks(x) # (B,T,C)
         x = self.ln_f(x) # (B,T,C)

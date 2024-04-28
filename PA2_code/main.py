@@ -1,4 +1,6 @@
+import argparse
 import torch
+from torch import nn
 from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence
 import os
@@ -7,6 +9,8 @@ from tokenizer import SimpleTokenizer
 from dataset import SpeechesClassificationDataset, LanguageModelingDataset
 
 from constants import seed, batch_size, block_size, learning_rate, n_embd, n_head, n_layer, n_input, n_output, n_hidden, epochs_CLS
+
+from transformer import Encoder, Decoder
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -42,6 +46,7 @@ def collate_batch(batch):
     labels = torch.stack(labels)  
     return padded_sequences, labels
 
+
 def compute_classifier_accuracy(classifier, data_loader):
     """ Compute the accuracy of the classifier on the data in data_loader."""
     classifier.eval()
@@ -50,7 +55,7 @@ def compute_classifier_accuracy(classifier, data_loader):
     with torch.no_grad():
         for X, Y in data_loader:
             X, Y = X.to(device), Y.to(device)
-            outputs = classifier(X)
+            outputs = classifier(X, device)
             _, predicted = torch.max(outputs.data, 1)
             total_correct += (predicted == Y).sum().item()
             total_samples += Y.size(0)
@@ -59,7 +64,7 @@ def compute_classifier_accuracy(classifier, data_loader):
         return accuracy
 
 
-def compute_perplexity(decoderLMmodel, data_loader, eval_iters=100):
+def compute_perplexity(decoderLMmodel: Decoder, data_loader, eval_iters=100):
     """ Compute the perplexity of the decoderLMmodel on the data in data_loader.
     Make sure to use the cross entropy loss for the decoderLMmodel.
     """
@@ -67,10 +72,11 @@ def compute_perplexity(decoderLMmodel, data_loader, eval_iters=100):
     losses= []
     for X, Y in data_loader:
         X, Y = X.to(device), Y.to(device)
-        loss = decoderLMmodel(X, Y) # your model should be computing the cross entropy loss
+        logits, loss = decoderLMmodel(X, device, Y) # your model should be computing the cross entropy loss
         losses.append(loss.item())
-        total_loss += loss.item()
-        if len(losses) >= eval_iters: break
+        # total_loss += loss.item()
+        if len(losses) >= eval_iters: 
+            break
 
 
     losses = torch.tensor(losses)
@@ -80,7 +86,32 @@ def compute_perplexity(decoderLMmodel, data_loader, eval_iters=100):
     decoderLMmodel.train()
     return perplexity
 
-def main():
+def train_epoch(data_loader, model, loss_fn, optimizer):
+    size = len(data_loader.dataset)
+    num_batches = len(data_loader)
+    model.train()
+    train_loss, correct = 0, 0
+    
+    for batch, (X, y) in enumerate(data_loader):
+        #  X = X.float()
+        # Compute prediction error
+        pred = model(X, device)
+        loss = loss_fn(pred, y)
+        train_loss += loss.item()
+        correct += (pred.argmax(1) == y).type(torch.float).sum().item()
+
+        # Backpropagation
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+    average_train_loss = train_loss / num_batches
+    accuracy = correct / size
+    return accuracy, average_train_loss
+
+
+# ------------------------------Classifier Code---------------------------------- #
+def run_classifier():
 
     print("Loading data and creating tokenizer ...")
     texts = load_texts('speechesdataset')
@@ -89,31 +120,93 @@ def main():
 
     train_CLS_dataset = SpeechesClassificationDataset(tokenizer, "speechesdataset/train_CLS.tsv")
     train_CLS_loader = DataLoader(train_CLS_dataset, batch_size=batch_size,collate_fn=collate_batch,shuffle=True)
+    
+    test_CLS_dataset = SpeechesClassificationDataset(tokenizer, "speechesdataset/test_CLS.tsv")
+    test_CLS_loader = DataLoader(test_CLS_dataset, batch_size=batch_size,collate_fn=collate_batch,shuffle=True)
+    
+    classifier_model = Encoder(tokenizer.vocab_size)
+    
+    # negative log likelihood loss function
+    loss_fn = nn.NLLLoss()
+    
+    total_params = sum(p.numel() for p in classifier_model.parameters())
+    print("Total number of parameters:", total_params)
 
+    # Adam optimizer
+    optimizer = torch.optim.Adam(classifier_model.parameters(), lr=learning_rate)
   
+     # for the classification task, you will train for a fixed number of epochs like this:
+    for epoch in range(epochs_CLS):
+        train_accuracy, train_loss = train_epoch(train_CLS_loader, classifier_model, loss_fn, optimizer)
+        print(f'Epoch #{epoch+1}: \t train accuracy {train_accuracy:.3f}\t train loss {train_loss:.3f}')
+        
+    print("Classifier accuracy: ", compute_classifier_accuracy(classifier_model, test_CLS_loader))
+            
+# ------------------------------Classifier Code---------------------------------- #
+    
+    
+# ------------------------------Decoder Code---------------------------------- #     
+def run_decoder():
+    print("Loading data and creating tokenizer ...")
+    texts = load_texts('speechesdataset')
+    tokenizer = SimpleTokenizer(' '.join(texts)) # create a tokenizer from the data
+    print("Vocabulary size is", tokenizer.vocab_size)   
+
     inputfile = "speechesdataset/train_LM.txt"
     with open(inputfile, 'r', encoding='utf-8') as f:
         lmtrainText = f.read()
     train_LM_dataset = LanguageModelingDataset(tokenizer, lmtrainText,  block_size)
     train_LM_loader = DataLoader(train_LM_dataset, batch_size=batch_size, shuffle=True)
-
-     # for the classification  task, you will train for a fixed number of epochs like this:
-    for epoch in range(epochs_CLS):
-        for xb, yb in train_CLS_loader:
-            xb, yb = xb.to(device), yb.to(device)
-            # CLS training code here
-
+    
+    decoder = Decoder(tokenizer.vocab_size)
+    
+    total_params = sum(p.numel() for p in decoder.parameters())
+    print("Total number of parameters:", total_params)
+    
+    optimizer = torch.optim.Adam(decoder.parameters(), lr=learning_rate)
 
     # for the language modeling task, you will iterate over the training data for a fixed number of iterations like this:
     for i, (xb, yb) in enumerate(train_LM_loader):
-        if i >= max_iters:
+        if i >= max_iters: # stop after 500 batches
             break
         xb, yb = xb.to(device), yb.to(device)
+        
         # LM training code here
+        
+        # evaluate the loss
+        logits, loss = decoder(xb, device, yb)
+        
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 
+    # calculate perplexity
+    files = ['speechesdataset/test_LM_hbush.tsv', 'speechesdataset/test_LM_obama.txt', 'speechesdataset/test_LM_wbush.txt']
     
+    for file in files:
+        with open(file, 'r', encoding='utf-8') as f:
+            data = f.read()
+        test_LM_dataset = LanguageModelingDataset(tokenizer, data,  block_size)
+        test_LM_loader = DataLoader(test_LM_dataset, batch_size=batch_size, shuffle=True)
+        
+        for i in range(5):
+            print("Iteration", (i+1)*100, file, compute_perplexity(decoder, test_LM_loader))
+        
+# ------------------------------Decoder Code---------------------------------- #  
 
 
+# ------------------------------MAIN---------------------------------- #  
+def main():
+    parser = argparse.ArgumentParser(description="Run classifier or decoder")
+    parser.add_argument("-mode", choices=["c", "d"], help="Choose mode: 'c' for classifier, 'd' for decoder")
+    args = parser.parse_args()
+
+    if args.mode == "c":
+        run_classifier()
+    elif args.mode == "d":
+        run_decoder()
+    else:
+        print("Invalid mode. Choose 'c' for classifier or 'd' for decoder.")
 
 if __name__ == "__main__":
     main()
