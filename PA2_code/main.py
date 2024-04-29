@@ -63,7 +63,6 @@ def compute_perplexity(decoderLMmodel: Decoder, data_loader, eval_iters=100):
         if len(losses) >= eval_iters: 
             break
 
-
     losses = torch.tensor(losses)
     mean_loss = losses.mean()
     perplexity = torch.exp(mean_loss).item()  # Calculate perplexity as exp(mean loss)
@@ -187,6 +186,8 @@ def run_decoder():
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+
+    print("Train Data Perplexity", compute_perplexity(decoder, train_LM_loader))
 
     # calculate perplexity
     files = ['speechesdataset/test_LM_hbush.tsv', 'speechesdataset/test_LM_obama.txt', 'speechesdataset/test_LM_wbush.txt']

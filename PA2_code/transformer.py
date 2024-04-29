@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
-from constants import batch_size, block_size, n_embd, n_head, n_layer, n_input, n_output, n_hidden, epochs_CLS
+from constants import block_size, n_embd, n_head, n_layer, n_input, n_output, n_hidden
 
 class Head(nn.Module):
     """ one head of self-attention """
