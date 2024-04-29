@@ -3,6 +3,8 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence
+from torch.nn import functional as F
+
 import os
 
 from tokenizer import SimpleTokenizer
@@ -47,23 +49,6 @@ def collate_batch(batch):
     return padded_sequences, labels
 
 
-def compute_classifier_accuracy(classifier, data_loader):
-    """ Compute the accuracy of the classifier on the data in data_loader."""
-    classifier.eval()
-    total_correct = 0
-    total_samples = 0
-    with torch.no_grad():
-        for X, Y in data_loader:
-            X, Y = X.to(device), Y.to(device)
-            outputs = classifier(X, device)
-            _, predicted = torch.max(outputs.data, 1)
-            total_correct += (predicted == Y).sum().item()
-            total_samples += Y.size(0)
-        accuracy = (100 * total_correct / total_samples)
-        classifier.train()
-        return accuracy
-
-
 def compute_perplexity(decoderLMmodel: Decoder, data_loader, eval_iters=100):
     """ Compute the perplexity of the decoderLMmodel on the data in data_loader.
     Make sure to use the cross entropy loss for the decoderLMmodel.
@@ -86,19 +71,42 @@ def compute_perplexity(decoderLMmodel: Decoder, data_loader, eval_iters=100):
     decoderLMmodel.train()
     return perplexity
 
-def train_epoch(data_loader, model, loss_fn, optimizer):
-    size = len(data_loader.dataset)
+
+def compute_classifier_accuracy(classifier: Encoder, data_loader):
+    """ Compute the accuracy of the classifier on the data in data_loader."""
+    classifier.eval()
+    total_correct = 0
+    total_samples = 0
+    with torch.no_grad():
+        for X, Y in data_loader:
+            X, Y = X.to(device), Y.to(device)
+            outputs = classifier(X, device)
+            _, predicted = torch.max(outputs.data, 1)
+            total_correct += (predicted == Y).sum().item()
+            total_samples += Y.size(0)
+        accuracy = (100 * total_correct / total_samples)
+        classifier.train()
+        return accuracy
+
+def train_epoch(data_loader, model: Encoder, loss_fn, optimizer):
+    # size = len(data_loader.dataset)
+    
     num_batches = len(data_loader)
     model.train()
-    train_loss, correct = 0, 0
+    train_loss, total_correct, total_samples = 0, 0, 0
     
-    for batch, (X, y) in enumerate(data_loader):
+    for batch, (X, Y) in enumerate(data_loader):
         #  X = X.float()
         # Compute prediction error
         pred = model(X, device)
-        loss = loss_fn(pred, y)
+        
+        _, predicted = torch.max(pred.data, 1)
+        total_correct += (predicted == Y).sum().item()
+        total_samples += Y.size(0)
+        
+        loss = F.cross_entropy(pred, Y)
+        
         train_loss += loss.item()
-        correct += (pred.argmax(1) == y).type(torch.float).sum().item()
 
         # Backpropagation
         optimizer.zero_grad()
@@ -106,7 +114,7 @@ def train_epoch(data_loader, model, loss_fn, optimizer):
         optimizer.step()
 
     average_train_loss = train_loss / num_batches
-    accuracy = correct / size
+    accuracy = total_correct / total_samples
     return accuracy, average_train_loss
 
 
@@ -119,10 +127,10 @@ def run_classifier():
     print("Vocabulary size is", tokenizer.vocab_size)
 
     train_CLS_dataset = SpeechesClassificationDataset(tokenizer, "speechesdataset/train_CLS.tsv")
-    train_CLS_loader = DataLoader(train_CLS_dataset, batch_size=batch_size,collate_fn=collate_batch,shuffle=True)
+    train_CLS_loader = DataLoader(train_CLS_dataset, batch_size=batch_size, collate_fn=collate_batch, shuffle=True)
     
     test_CLS_dataset = SpeechesClassificationDataset(tokenizer, "speechesdataset/test_CLS.tsv")
-    test_CLS_loader = DataLoader(test_CLS_dataset, batch_size=batch_size,collate_fn=collate_batch,shuffle=True)
+    test_CLS_loader = DataLoader(test_CLS_dataset, batch_size=batch_size, collate_fn=collate_batch, shuffle=True)
     
     classifier_model = Encoder(tokenizer.vocab_size)
     

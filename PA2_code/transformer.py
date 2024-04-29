@@ -22,12 +22,14 @@ class Head(nn.Module):
         # input of size (batch, time-step, channels)
         # output of size (batch, time-step, head size)
         B,T,C = x.shape
+        
         k = self.key(x)   # (B,T,hs)
         q = self.query(x) # (B,T,hs)
         # compute attention scores ("affinities")
         wei = q @ k.transpose(-2,-1) * k.shape[-1]**-0.5 # (B, T, hs) @ (B, hs, T) -> (B, T, T)
         
         if self.decoding:
+            # print("mask??")
             wei = wei.masked_fill(self.tril[:T, :T] == 0, float('-inf')) # (B, T, T)
         
         wei = F.softmax(wei, dim=-1) # (B, T, T)
