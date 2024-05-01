@@ -58,7 +58,7 @@ def compute_perplexity(decoderLMmodel: Decoder, data_loader, eval_iters=100):
     losses= []
     for X, Y in data_loader:
         X, Y = X.to(device), Y.to(device)
-        logits = decoderLMmodel(X) # your model should be computing the cross entropy loss
+        logits, _ = decoderLMmodel(X) # your model should be computing the cross entropy loss
         B, T, C = logits.shape
         
         logits = logits.view(B*T, C)
@@ -86,7 +86,7 @@ def compute_classifier_accuracy(classifier: Encoder, data_loader):
     with torch.no_grad():
         for X, Y in data_loader:
             X, Y = X.to(device), Y.to(device)
-            outputs = classifier(X)
+            outputs, _ = classifier(X)
             _, predicted = torch.max(outputs.data, 1)
             total_correct += (predicted == Y).sum().item()
             total_samples += Y.size(0)
@@ -104,7 +104,7 @@ def train_epoch(data_loader, model: Encoder, optimizer):
     for batch, (X, Y) in enumerate(data_loader):
         #  X = X.float()
         # Compute prediction error
-        pred = model(X)
+        pred, _ = model(X)
         
         _, predicted = torch.max(pred.data, 1)
         total_correct += (predicted == Y).sum().item()
@@ -185,7 +185,7 @@ def run_decoder():
         # LM training code here
         
         # evaluate the loss
-        logits = decoder(xb)
+        logits, _ = decoder(xb)
         B, T, C = logits.shape
         
         logits = logits.view(B*T, C)
@@ -235,7 +235,8 @@ def run_sanity_check_decoder():
     ec = Decoder(tokenizer.vocab_size)
     u = Utilities(tokenizer, ec)
     
-    u.sanity_check(block_size)
+    for text in texts: 
+        u.sanity_check(text, block_size)
 
 
 # ------------------------------MAIN---------------------------------- #  

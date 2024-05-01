@@ -18,7 +18,7 @@ class Head(nn.Module):
 
         # self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x):
+    def forward(self, x, attention_maps):
         # input of size (batch, time-step, channels)
         # output of size (batch, time-step, head size)
         B,T,C = x.shape
@@ -36,9 +36,13 @@ class Head(nn.Module):
         
         # wei = self.dropout(wei)
         
+        attention_maps.append(wei)
+        
         # perform the weighted aggregation of the values
         v = self.value(x) # (B,T,hs)
+        
         out = wei @ v # (B, T, T) @ (B, T, hs) -> (B, T, hs)
+        
         return out
 
 class MultiHeadAttention(nn.Module):
@@ -50,9 +54,8 @@ class MultiHeadAttention(nn.Module):
         self.proj = nn.Linear(head_size * num_heads, n_embd)
         #self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x):
-        out = torch.cat([h(x) for h in self.heads], dim=-1)
-        
+    def forward(self, x, attention_maps):
+        out = torch.cat([h(x, attention_maps) for h in self.heads], dim=-1)
         return self.proj(out)
 
 class FeedFoward(nn.Module):
@@ -77,13 +80,13 @@ class Block(nn.Module):
         # n_embd: embedding dimension, n_head: the number of heads we'd like
         super().__init__()
         head_size = n_embd // n_head
-        self.sa = MultiHeadAttention(n_head, head_size, decoding)
+        self.sa: MultiHeadAttention = MultiHeadAttention(n_head, head_size, decoding)
         self.ffwd = FeedFoward(n_embd)
         self.ln1 = nn.LayerNorm(n_embd)
         self.ln2 = nn.LayerNorm(n_embd)
 
-    def forward(self, x):
-        x = x + self.sa(self.ln1(x))
+    def forward(self, x, attention_maps=None):
+        x = x + self.sa(self.ln1(x), attention_maps)
         x = x + self.ffwd(self.ln2(x))
         return x
 
@@ -108,7 +111,7 @@ class Encoder(nn.Module):
         # each token directly reads off the logits for the next token from a lookup table
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
         self.position_embedding_table = nn.Embedding(block_size, n_embd)
-        self.blocks = nn.Sequential(*[Block(n_embd, n_head=n_head, decoding=False) for _ in range(n_layer)])
+        self.blocks = nn.ModuleList([Block(n_embd, n_head=n_head, decoding=False) for _ in range(n_layer)])
         # self.ln_f = nn.LayerNorm(n_embd) # final layer norm
         self.classifier = Classifier(input_size=n_embd, hidden_size=n_hidden)
 
@@ -120,12 +123,15 @@ class Encoder(nn.Module):
         pos_emb = self.position_embedding_table(torch.arange(T)) # (T,C)
         x = tok_emb + pos_emb # (B,T,C)
         
-        x = self.blocks(x) # (B,T,C)
+        attention_maps = []
+        
+        for block in self.blocks:
+           x = block(x, attention_maps) # (B,T,C)
         # x = self.ln_f(x) # (B,T,C)
         
         x = torch.mean(x, dim=1)
         
-        return self.classifier(x)
+        return self.classifier(x), attention_maps
         
 class Decoder(nn.Module):
     def __init__(self, vocab_size):
@@ -133,7 +139,7 @@ class Decoder(nn.Module):
         # each token directly reads off the logits for the next token from a lookup table
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
         self.position_embedding_table = nn.Embedding(block_size, n_embd)
-        self.blocks = nn.Sequential(*[Block(n_embd, n_head=n_head, decoding=True) for _ in range(n_layer)])
+        self.blocks = nn.ModuleList([Block(n_embd, n_head=n_head, decoding=True) for _ in range(n_layer)])
         self.ln_f = nn.LayerNorm(n_embd) # final layer norm
         self.lm_head = nn.Linear(n_embd, vocab_size)
 
@@ -145,6 +151,11 @@ class Decoder(nn.Module):
         pos_emb = self.position_embedding_table(torch.arange(T)) # (T,C)
         
         x = tok_emb + pos_emb # (B,T,C)
-        x = self.blocks(x) # (B,T,C)
+        
+        attention_maps = []
+        
+        for block in self.blocks:
+           x = block(x, attention_maps) # (B,T,C)
+           
         x = self.ln_f(x) # (B,T,C)
-        return self.lm_head(x) # (B,T,vocab_size)
+        return self.lm_head(x), attention_maps # (B,T,vocab_size)
