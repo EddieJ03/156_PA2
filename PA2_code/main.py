@@ -7,6 +7,7 @@ from torch.nn import functional as F
 
 import os
 
+from utilities import Utilities
 from tokenizer import SimpleTokenizer
 from dataset import SpeechesClassificationDataset, LanguageModelingDataset
 
@@ -57,7 +58,13 @@ def compute_perplexity(decoderLMmodel: Decoder, data_loader, eval_iters=100):
     losses= []
     for X, Y in data_loader:
         X, Y = X.to(device), Y.to(device)
-        logits, loss = decoderLMmodel(X, device, Y) # your model should be computing the cross entropy loss
+        logits = decoderLMmodel(X) # your model should be computing the cross entropy loss
+        B, T, C = logits.shape
+        
+        logits = logits.view(B*T, C)
+        targets = Y.view(B*T)
+        loss = F.cross_entropy(logits, targets)
+        
         losses.append(loss.item())
         # total_loss += loss.item()
         if len(losses) >= eval_iters: 
@@ -79,7 +86,7 @@ def compute_classifier_accuracy(classifier: Encoder, data_loader):
     with torch.no_grad():
         for X, Y in data_loader:
             X, Y = X.to(device), Y.to(device)
-            outputs = classifier(X, device)
+            outputs = classifier(X)
             _, predicted = torch.max(outputs.data, 1)
             total_correct += (predicted == Y).sum().item()
             total_samples += Y.size(0)
@@ -87,7 +94,7 @@ def compute_classifier_accuracy(classifier: Encoder, data_loader):
         classifier.train()
         return accuracy
 
-def train_epoch(data_loader, model: Encoder, loss_fn, optimizer):
+def train_epoch(data_loader, model: Encoder, optimizer):
     # size = len(data_loader.dataset)
     
     num_batches = len(data_loader)
@@ -97,7 +104,7 @@ def train_epoch(data_loader, model: Encoder, loss_fn, optimizer):
     for batch, (X, Y) in enumerate(data_loader):
         #  X = X.float()
         # Compute prediction error
-        pred = model(X, device)
+        pred = model(X)
         
         _, predicted = torch.max(pred.data, 1)
         total_correct += (predicted == Y).sum().item()
@@ -133,18 +140,15 @@ def run_classifier():
     
     classifier_model = Encoder(tokenizer.vocab_size)
     
-    # negative log likelihood loss function
-    loss_fn = nn.NLLLoss()
-    
     total_params = sum(p.numel() for p in classifier_model.parameters())
     print("Total number of parameters:", total_params)
 
     # Adam optimizer
-    optimizer = torch.optim.Adam(classifier_model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.AdamW(classifier_model.parameters(), lr=learning_rate)
   
      # for the classification task, you will train for a fixed number of epochs like this:
     for epoch in range(epochs_CLS):
-        train_accuracy, train_loss = train_epoch(train_CLS_loader, classifier_model, loss_fn, optimizer)
+        train_accuracy, train_loss = train_epoch(train_CLS_loader, classifier_model, optimizer)
         print(f'Epoch #{epoch+1}: \t train accuracy {train_accuracy:.3f}\t train loss {train_loss:.3f}')
         
     print("Classifier accuracy: ", compute_classifier_accuracy(classifier_model, test_CLS_loader))
@@ -181,7 +185,12 @@ def run_decoder():
         # LM training code here
         
         # evaluate the loss
-        logits, loss = decoder(xb, device, yb)
+        logits = decoder(xb)
+        B, T, C = logits.shape
+        
+        logits = logits.view(B*T, C)
+        targets = yb.view(B*T)
+        loss = F.cross_entropy(logits, targets)
         
         optimizer.zero_grad()
         loss.backward()
@@ -204,16 +213,45 @@ def run_decoder():
 # ------------------------------Decoder Code---------------------------------- #  
 
 
+def run_sanity_check_encoder():
+    print("Loading data and creating tokenizer ...")
+    texts = load_texts('speechesdataset')
+    tokenizer = SimpleTokenizer(' '.join(texts)) # create a tokenizer from the data
+    print("Vocabulary size is", tokenizer.vocab_size)   
+    
+    ec = Encoder(tokenizer.vocab_size)
+    u = Utilities(tokenizer, ec)
+    
+    for text in texts: 
+        u.sanity_check(text, block_size)
+    
+    
+def run_sanity_check_decoder():
+    print("Loading data and creating tokenizer ...")
+    texts = load_texts('speechesdataset')
+    tokenizer = SimpleTokenizer(' '.join(texts)) # create a tokenizer from the data
+    print("Vocabulary size is", tokenizer.vocab_size)   
+    
+    ec = Decoder(tokenizer.vocab_size)
+    u = Utilities(tokenizer, ec)
+    
+    u.sanity_check(block_size)
+
+
 # ------------------------------MAIN---------------------------------- #  
 def main():
     parser = argparse.ArgumentParser(description="Run classifier or decoder")
-    parser.add_argument("-mode", choices=["c", "d"], help="Choose mode: 'c' for classifier, 'd' for decoder")
+    parser.add_argument("-mode", choices=["e", "d", "se", "sd"], help="Choose mode: 'e' for encoder, 'd' for decoder, 'se' for sanity checking encoder, 'sd' for sanity checking decoder")
     args = parser.parse_args()
 
-    if args.mode == "c":
+    if args.mode == "e":
         run_classifier()
     elif args.mode == "d":
         run_decoder()
+    elif args.mode == 'se':
+        run_sanity_check_encoder()
+    elif args.mode == 'sd':
+        run_sanity_check_decoder()
     else:
         print("Invalid mode. Choose 'c' for classifier or 'd' for decoder.")
 

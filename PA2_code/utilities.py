@@ -19,7 +19,7 @@ class Utilities:
         print("Input tensor shape:", input_tensor.shape)
 
         # Process the input tensor through the encoder model
-        _, _, attn_maps, _ = self.model(input_tensor)
+        _, attn_maps = self.model(input_tensor)
 
         # Display the number of attention maps
         print("Number of attention maps:", len(attn_maps))
