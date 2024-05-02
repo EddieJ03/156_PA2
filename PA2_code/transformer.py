@@ -64,9 +64,9 @@ class FeedFoward(nn.Module):
     def __init__(self, n_embd):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(n_embd, 4*n_embd),
+            nn.Linear(n_embd, 8*n_embd),
             nn.GELU(),
-            nn.Linear(4*n_embd, n_embd),
+            nn.Linear(8*n_embd, n_embd),
             # nn.Dropout(dropout),
         )
 
@@ -112,7 +112,7 @@ class Encoder(nn.Module):
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
         self.position_embedding_table = nn.Embedding(block_size, n_embd)
         self.blocks = nn.ModuleList([Block(n_embd, n_head=n_head, decoding=False) for _ in range(n_layer)])
-        self.ln_f = nn.LayerNorm(n_embd) # final layer norm
+        # self.ln_f = nn.LayerNorm(n_embd) # final layer norm
         self.classifier = Classifier(input_size=n_embd, hidden_size=n_hidden)
 
     def forward(self, idx):
@@ -128,7 +128,7 @@ class Encoder(nn.Module):
         for block in self.blocks:
            x = block(x, attention_maps) # (B,T,C)
         
-        x = self.ln_f(x) # (B,T,C)
+        # x = self.ln_f(x) # (B,T,C)
         
         x = torch.mean(x, dim=1)
         
