@@ -144,7 +144,7 @@ def run_classifier():
     print("Total number of parameters:", total_params)
 
     # Adam optimizer
-    optimizer = torch.optim.AdamW(classifier_model.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(classifier_model.parameters(), lr=learning_rate)
   
      # for the classification task, you will train for a fixed number of epochs like this:
     for epoch in range(epochs_CLS):
@@ -152,6 +152,12 @@ def run_classifier():
         print(f'Epoch #{epoch+1}: \t train accuracy {train_accuracy:.3f}\t train loss {train_loss:.3f}')
         
     print("Classifier accuracy: ", compute_classifier_accuracy(classifier_model, test_CLS_loader))
+    
+    u = Utilities(tokenizer, classifier_model)
+    
+    print('Running Sanity Checker: ')
+    u.sanity_check('The man who passes the sentence should swing the sword. If you would take a man\'s life, you owe it to him to look into his eyes and hear his final words. And if you cannot bear to do that, then perhaps the man does not deserve to die.', block_size)
+    
             
 # ------------------------------Classifier Code---------------------------------- #
     
@@ -182,6 +188,9 @@ def run_decoder():
             break
         xb, yb = xb.to(device), yb.to(device)
         
+        if (i+1)%100 == 0:
+            print("Train Data Perplexity At Iteration ", (i+1), compute_perplexity(decoder, train_LM_loader))
+        
         # LM training code here
         
         # evaluate the loss
@@ -196,8 +205,6 @@ def run_decoder():
         loss.backward()
         optimizer.step()
 
-    print("Train Data Perplexity", compute_perplexity(decoder, train_LM_loader))
-
     # calculate perplexity
     files = ['speechesdataset/test_LM_hbush.tsv', 'speechesdataset/test_LM_obama.txt', 'speechesdataset/test_LM_wbush.txt']
     
@@ -209,6 +216,11 @@ def run_decoder():
         
         for i in range(5):
             print("Iteration", (i+1)*100, file, compute_perplexity(decoder, test_LM_loader))
+            
+    u = Utilities(tokenizer, decoder)
+    
+    print('Running Sanity Checker: ')
+    u.sanity_check('The man who passes the sentence should swing the sword. If you would take a man\'s life, you owe it to him to look into his eyes and hear his final words. And if you cannot bear to do that, then perhaps the man does not deserve to die.', block_size)
         
 # ------------------------------Decoder Code---------------------------------- #  
 
@@ -222,8 +234,7 @@ def run_sanity_check_encoder():
     ec = Encoder(tokenizer.vocab_size)
     u = Utilities(tokenizer, ec)
     
-    for text in texts: 
-        u.sanity_check(text, block_size)
+    u.sanity_check('The man who passes the sentence should swing the sword. If you would take a man\'s life, you owe it to him to look into his eyes and hear his final words. And if you cannot bear to do that, then perhaps the man does not deserve to die.', block_size)
     
     
 def run_sanity_check_decoder():
@@ -235,8 +246,7 @@ def run_sanity_check_decoder():
     ec = Decoder(tokenizer.vocab_size)
     u = Utilities(tokenizer, ec)
     
-    for text in texts: 
-        u.sanity_check(text, block_size)
+    u.sanity_check('The man who passes the sentence should swing the sword. If you would take a man\'s life, you owe it to him to look into his eyes and hear his final words. And if you cannot bear to do that, then perhaps the man does not deserve to die.', block_size)
 
 
 # ------------------------------MAIN---------------------------------- #  
