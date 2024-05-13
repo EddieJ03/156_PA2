@@ -13,7 +13,7 @@ from dataset import SpeechesClassificationDataset, LanguageModelingDataset
 
 from constants import seed, batch_size, block_size, learning_rate, n_embd, n_head, n_layer, n_input, n_output, n_hidden, epochs_CLS
 
-from transformer import Encoder, Decoder
+from transformer import Classifier, Decoder
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -77,8 +77,7 @@ def compute_perplexity(decoderLMmodel: Decoder, data_loader, eval_iters=100):
     decoderLMmodel.train()
     return perplexity
 
-
-def compute_classifier_accuracy(classifier: Encoder, data_loader):
+def compute_classifier_accuracy(classifier: Classifier, data_loader):
     """ Compute the accuracy of the classifier on the data in data_loader."""
     classifier.eval()
     total_correct = 0
@@ -94,7 +93,7 @@ def compute_classifier_accuracy(classifier: Encoder, data_loader):
         classifier.train()
         return accuracy
 
-def train_epoch(data_loader, model: Encoder, optimizer):
+def train_epoch(data_loader, model: Classifier, optimizer):
     # size = len(data_loader.dataset)
     
     num_batches = len(data_loader)
@@ -104,13 +103,19 @@ def train_epoch(data_loader, model: Encoder, optimizer):
     for batch, (X, Y) in enumerate(data_loader):
         #  X = X.float()
         # Compute prediction error
+        # print('----------------------------------------------------')
         pred, _ = model(X)
         
         _, predicted = torch.max(pred.data, 1)
         total_correct += (predicted == Y).sum().item()
         total_samples += Y.size(0)
         
-        loss = F.cross_entropy(pred, Y)
+        # print("pred: ", pred.shape)
+        # print("predicted", predicted.shape)
+        # print("y", Y.shape)
+        # print('----------------------------------------------------')
+        
+        loss = F.cross_entropy(input=pred, target=Y)
         
         train_loss += loss.item()
 
@@ -120,7 +125,7 @@ def train_epoch(data_loader, model: Encoder, optimizer):
         optimizer.step()
 
     average_train_loss = train_loss / num_batches
-    accuracy = total_correct / total_samples
+    accuracy = (100 * total_correct / total_samples)
     return accuracy, average_train_loss
 
 
@@ -138,7 +143,7 @@ def run_classifier():
     test_CLS_dataset = SpeechesClassificationDataset(tokenizer, "speechesdataset/test_CLS.tsv")
     test_CLS_loader = DataLoader(test_CLS_dataset, batch_size=batch_size, collate_fn=collate_batch, shuffle=True)
     
-    classifier_model = Encoder(tokenizer.vocab_size)
+    classifier_model = Classifier(tokenizer.vocab_size)
     
     total_params = sum(p.numel() for p in classifier_model.parameters())
     print("Total number of parameters:", total_params)
@@ -149,9 +154,7 @@ def run_classifier():
      # for the classification task, you will train for a fixed number of epochs like this:
     for epoch in range(epochs_CLS):
         train_accuracy, train_loss = train_epoch(train_CLS_loader, classifier_model, optimizer)
-        print(f'Epoch #{epoch+1}: \t train accuracy {train_accuracy:.3f}\t train loss {train_loss:.3f}')
-        
-    print("Classifier accuracy: ", compute_classifier_accuracy(classifier_model, test_CLS_loader))
+        print(f'Epoch #{epoch+1}: \t train accuracy {train_accuracy:.3f}\t train loss {train_loss:.3f}\t test accuracy {compute_classifier_accuracy(classifier_model, test_CLS_loader):.3f}')
     
     u = Utilities(tokenizer, classifier_model)
     
@@ -231,7 +234,7 @@ def run_sanity_check_encoder():
     tokenizer = SimpleTokenizer(' '.join(texts)) # create a tokenizer from the data
     print("Vocabulary size is", tokenizer.vocab_size)   
     
-    ec = Encoder(tokenizer.vocab_size)
+    ec = Classifier(tokenizer.vocab_size)
     u = Utilities(tokenizer, ec)
     
     u.sanity_check('The man who passes the sentence should swing the sword. If you would take a man\'s life, you owe it to him to look into his eyes and hear his final words. And if you cannot bear to do that, then perhaps the man does not deserve to die.', block_size)
@@ -252,14 +255,14 @@ def run_sanity_check_decoder():
 # ------------------------------MAIN---------------------------------- #  
 def main():
     parser = argparse.ArgumentParser(description="Run classifier or decoder")
-    parser.add_argument("-mode", choices=["e", "d", "se", "sd"], help="Choose mode: 'e' for encoder, 'd' for decoder, 'se' for sanity checking encoder, 'sd' for sanity checking decoder")
+    parser.add_argument("-mode", choices=["c", "d", "sc", "sd"], help="Choose mode: 'c' for classifier, 'd' for decoder, 'sc' for sanity checking classifier, 'sd' for sanity checking decoder")
     args = parser.parse_args()
 
-    if args.mode == "e":
+    if args.mode == "c":
         run_classifier()
     elif args.mode == "d":
         run_decoder()
-    elif args.mode == 'se':
+    elif args.mode == 'sc':
         run_sanity_check_encoder()
     elif args.mode == 'sd':
         run_sanity_check_decoder()

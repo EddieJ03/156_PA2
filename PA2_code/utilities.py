@@ -27,6 +27,8 @@ class Utilities:
         # Visualize and save the attention maps
         for j, attn_map in enumerate(attn_maps):
             att_map = attn_map.squeeze(0).detach().cpu().numpy()  # Remove batch dimension and convert to NumPy array
+            
+            print("map shape", att_map.shape, att_map.ndim)
 
             # Check if the attention probabilities sum to 1 over rows
             total_prob_over_rows = torch.sum(attn_map[0], dim=1)
@@ -45,7 +47,7 @@ class Utilities:
             plt.savefig(f"attention_map_{j + 1}.png")
             
             # Show the plot
-            plt.show()
+            # plt.show()
             
 
 
