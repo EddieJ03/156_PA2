@@ -13,7 +13,7 @@ from dataset import SpeechesClassificationDataset, LanguageModelingDataset
 
 from constants import seed, batch_size, block_size, learning_rate, n_embd, n_head, n_layer, n_input, n_output, n_hidden, epochs_CLS
 
-from transformer import Classifier, Decoder
+from transformer import Classifier, Decoder, ClassifierEC
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -93,7 +93,7 @@ def compute_classifier_accuracy(classifier: Classifier, data_loader):
         classifier.train()
         return accuracy
 
-def train_epoch(data_loader, model: Classifier, optimizer):
+def train_epoch(data_loader, model, optimizer):
     # size = len(data_loader.dataset)
     
     num_batches = len(data_loader)
@@ -252,10 +252,40 @@ def run_sanity_check_decoder():
     u.sanity_check('The man who passes the sentence should swing the sword. If you would take a man\'s life, you owe it to him to look into his eyes and hear his final words. And if you cannot bear to do that, then perhaps the man does not deserve to die.', block_size)
 
 
+def run_ec_classifier():
+    print("EXTRA CREDIT:")
+    texts = load_texts('speechesdataset')
+    tokenizer = SimpleTokenizer(' '.join(texts)) # create a tokenizer from the data
+    print("Vocabulary size is", tokenizer.vocab_size)
+
+    train_CLS_dataset = SpeechesClassificationDataset(tokenizer, "speechesdataset/train_CLS.tsv")
+    train_CLS_loader = DataLoader(train_CLS_dataset, batch_size=batch_size, collate_fn=collate_batch, shuffle=True)
+    
+    test_CLS_dataset = SpeechesClassificationDataset(tokenizer, "speechesdataset/test_CLS.tsv")
+    test_CLS_loader = DataLoader(test_CLS_dataset, batch_size=batch_size, collate_fn=collate_batch, shuffle=True)
+    
+    classifier_model = ClassifierEC(tokenizer.vocab_size, n_head, 6)
+    
+    total_params = sum(p.numel() for p in classifier_model.parameters())
+    print("Total number of parameters:", total_params)
+
+    # Adam optimizer
+    optimizer = torch.optim.Adam(classifier_model.parameters(), lr=0.0001)
+    
+     # for the classification task, you will train for a fixed number of epochs like this:
+    for epoch in range(epochs_CLS):
+        train_accuracy, train_loss = train_epoch(train_CLS_loader, classifier_model, optimizer)
+        print(f'Epoch #{epoch+1}: \t train accuracy {train_accuracy:.3f}\t train loss {train_loss:.3f}\t test accuracy {compute_classifier_accuracy(classifier_model, test_CLS_loader):.3f}')
+    
+    u = Utilities(tokenizer, classifier_model)
+    
+    print('Running Sanity Checker: ')
+    u.sanity_check('The man who passes the sentence should swing the sword. If you would take a man\'s life, you owe it to him to look into his eyes and hear his final words. And if you cannot bear to do that, then perhaps the man does not deserve to die.', block_size)
+
 # ------------------------------MAIN---------------------------------- #  
 def main():
     parser = argparse.ArgumentParser(description="Run classifier or decoder")
-    parser.add_argument("-mode", choices=["c", "d", "sc", "sd"], help="Choose mode: 'c' for classifier, 'd' for decoder, 'sc' for sanity checking classifier, 'sd' for sanity checking decoder")
+    parser.add_argument("-mode", choices=["c", "d", "sc", "sd", "ecc"], help="Choose mode: 'c' for classifier, 'd' for decoder, 'sc' for sanity checking classifier, 'sd' for sanity checking decoder, 'ecc' for classifier EC")
     args = parser.parse_args()
 
     if args.mode == "c":
@@ -266,6 +296,8 @@ def main():
         run_sanity_check_encoder()
     elif args.mode == 'sd':
         run_sanity_check_decoder()
+    elif args.mode == 'ecc':
+        run_ec_classifier()
     else:
         print("Invalid mode.")
 

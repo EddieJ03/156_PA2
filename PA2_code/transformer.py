@@ -5,7 +5,7 @@ from torch.nn import functional as F
 
 from constants import block_size, n_embd, n_head, n_layer, n_input, n_output, n_hidden
 
-dropout = 0.2
+dropout = 0.3
 
 class Head(nn.Module):
     """ one head of self-attention """
@@ -33,9 +33,9 @@ class Head(nn.Module):
         
         wei = F.softmax(wei, dim=-1) 
         
-        # wei = self.dropout(wei)
-        
         attention_maps.append(wei)
+        
+        # wei = self.dropout(wei)
         
         v = self.value(x) 
         
@@ -109,7 +109,7 @@ class Encoder(nn.Module):
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
         # self.position_embedding_table = nn.Embedding(block_size, n_embd)
         self.blocks = nn.ModuleList([Block(n_embd, n_head=n_head, decoding=False) for _ in range(n_layer)])
-
+            
     def forward(self, idx):
         B, T = idx.shape
 
@@ -177,3 +177,28 @@ class Decoder(nn.Module):
            
         x = self.ln_f(x) 
         return self.lm_head(x), attention_maps 
+
+
+class ClassifierEC(nn.Module):
+    def __init__(self, vocab_size, n_head, n_layer):
+        super().__init__()
+        self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
+        self.position_embedding_table = nn.Embedding(block_size, n_embd)
+        self.blocks = nn.ModuleList([Block(n_embd, n_head=n_head, decoding=False) for _ in range(n_layer)])
+
+    def forward(self, idx):
+        B, T = idx.shape
+
+        tok_emb = self.token_embedding_table(idx) 
+        pos_emb = self.position_embedding_table(torch.arange(T)) 
+        
+        x = tok_emb + pos_emb
+        
+        attention_maps = []
+        
+        for block in self.blocks:
+           x = block(x, attention_maps) 
+        
+        x = torch.mean(x, dim=1)
+        
+        return x, attention_maps
