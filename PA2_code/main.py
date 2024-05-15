@@ -150,7 +150,7 @@ def run_classifier():
 
     # Adam optimizer
     optimizer = torch.optim.Adam(classifier_model.parameters(), lr=learning_rate)
-  
+    
      # for the classification task, you will train for a fixed number of epochs like this:
     for epoch in range(epochs_CLS):
         train_accuracy, train_loss = train_epoch(train_CLS_loader, classifier_model, optimizer)
@@ -267,7 +267,7 @@ def main():
     elif args.mode == 'sd':
         run_sanity_check_decoder()
     else:
-        print("Invalid mode. Choose 'c' for classifier or 'd' for decoder.")
+        print("Invalid mode.")
 
 if __name__ == "__main__":
     main()
