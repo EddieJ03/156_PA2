@@ -18,7 +18,7 @@ class Head(nn.Module):
         self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
         self.decoding = decoding
 
-        self.dropout = nn.Dropout(dropout)
+        # self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, attention_maps):
         B,T,C = x.shape
@@ -52,10 +52,14 @@ class MultiHeadAttention(nn.Module):
         self.proj = nn.Linear(head_size * num_heads, n_embd)
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x, attention_maps):
+    def forward(self, x, attention_maps, dropout=False):
         out = torch.cat([h(x, attention_maps) for h in self.heads], dim=-1)
+        
+        if dropout:
+            print('DROPOUT')
+            return self.dropout(self.proj(out))
+        
         return self.proj(out)
-        # return self.dropout(self.proj(out))
 
 class FeedFoward(nn.Module):
     """ a simple linear layer followed by a non-linearity """
@@ -66,10 +70,15 @@ class FeedFoward(nn.Module):
             nn.Linear(n_embd, 4*n_embd),
             nn.ReLU(),
             nn.Linear(4*n_embd, n_embd),
-            # nn.Dropout(dropout),
         )
+        
+        self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x):
+    def forward(self, x, dropout=False):
+        if dropout:
+            print('DROPOUT')
+            return self.dropout(self.net(x))
+        
         return self.net(x)
 
 class Block(nn.Module):
@@ -83,10 +92,10 @@ class Block(nn.Module):
         self.ln1 = nn.LayerNorm(n_embd)
         self.ln2 = nn.LayerNorm(n_embd)
 
-    def forward(self, x, attention_maps=None):
-        x = x + self.sa(self.ln1(x), attention_maps)
+    def forward(self, x, attention_maps=None, dropout=False):
+        x = x + self.sa(self.ln1(x), attention_maps, dropout)
         
-        x = self.ln2(x + self.ffwd(x))
+        x = self.ln2(x + self.ffwd(x, dropout))
         return x
 
 class Classifier(nn.Module):
@@ -94,7 +103,7 @@ class Classifier(nn.Module):
         super().__init__()
         self.fc1 = nn.Linear(input_size, hidden_size)  # First fully connected layer.
         self.fc2 = nn.Linear(hidden_size, n_output)  # Second fully connected layer, outputting three classes.
-        self.encoder = Encoder(vocab_size)
+        self.encoder = Encoder(vocab_size, n_head, n_layer)
 
     def forward(self, x):
         x, attn_maps = self.encoder(x)
@@ -107,16 +116,13 @@ class Encoder(nn.Module):
     def __init__(self, vocab_size, n_head=n_head, n_layer=n_layer):
         super().__init__()
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
-        # self.position_embedding_table = nn.Embedding(block_size, n_embd)
         self.blocks = nn.ModuleList([Block(n_embd, n_head=n_head, decoding=False) for _ in range(n_layer)])
             
     def forward(self, idx):
         B, T = idx.shape
 
         tok_emb = self.token_embedding_table(idx) 
-        # pos_emb = self.position_embedding_table(torch.arange(T)) 
         
-        even_i = torch.arange(0, n_embd, 2).float()
         odd_i = torch.arange(1, n_embd, 2).float()
         even_denominator = torch.pow(10000, (odd_i - 1)/n_embd)
 
@@ -144,16 +150,14 @@ class Decoder(nn.Module):
     def __init__(self, vocab_size):
         super().__init__()
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
-        # self.position_embedding_table = nn.Embedding(block_size, n_embd)
         self.blocks = nn.ModuleList([Block(n_embd, n_head=n_head, decoding=True) for _ in range(n_layer)])
         self.ln_f = nn.LayerNorm(n_embd) 
         self.lm_head = nn.Linear(n_embd, vocab_size)
 
-    def forward(self, idx):
+    def forward(self, idx, dropout=False):
         B, T = idx.shape
         
         tok_emb = self.token_embedding_table(idx) 
-        # pos_emb = self.position_embedding_table(torch.arange(T))
 
         even_i = torch.arange(0, n_embd, 2).float()
         odd_i = torch.arange(1, n_embd, 2).float()
@@ -173,21 +177,34 @@ class Decoder(nn.Module):
         attention_maps = []
         
         for block in self.blocks:
-           x = block(x, attention_maps) 
+           x = block(x, attention_maps, False) 
            
         x = self.ln_f(x) 
         return self.lm_head(x), attention_maps 
 
 
-class ClassifierEC(nn.Module):
-    def __init__(self, vocab_size, n_head=n_head, n_layer=n_layer, input_size=n_embd, hidden_size=n_hidden):
+class DecoderEC(nn.Module):
+    def __init__(self, vocab_size, n_head=n_head, n_layer=n_layer):
         super().__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)  # First fully connected layer.
-        self.fc2 = nn.Linear(hidden_size, n_output)  # Second fully connected layer, outputting three classes.
-        self.encoder = Encoder(vocab_size, n_head, n_layer)
+        self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
+        self.position_embedding_table = nn.Embedding(block_size, n_embd)
+        self.blocks = nn.ModuleList([Block(n_embd, n_head=n_head, decoding=True) for _ in range(n_layer)])
+        self.ln_f = nn.LayerNorm(n_embd) 
+        self.lm_head = nn.Linear(n_embd, vocab_size)
 
-    def forward(self, x):
-        x, attn_maps = self.encoder(x)
-        x = F.relu(self.fc1(x))  # Apply ReLU activation function after the first layer.
-        x = self.fc2(x)  # Pass the result to the second layer.
-        return x, attn_maps
+    def forward(self, idx):
+        B, T = idx.shape
+        
+        tok_emb = self.token_embedding_table(idx) 
+
+        pos_emb = self.position_embedding_table(torch.arange(T))
+        
+        x = tok_emb + pos_emb 
+        
+        attention_maps = []
+        
+        for block in self.blocks:
+           x = block(x, attention_maps, True) 
+           
+        x = self.ln_f(x) 
+        return self.lm_head(x), attention_maps 

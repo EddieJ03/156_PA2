@@ -13,7 +13,7 @@ from dataset import SpeechesClassificationDataset, LanguageModelingDataset
 
 from constants import seed, batch_size, block_size, learning_rate, n_embd, n_head, n_layer, n_input, n_output, n_hidden, epochs_CLS
 
-from transformer import Classifier, Decoder, ClassifierEC
+from transformer import Classifier, Decoder, DecoderEC
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -156,12 +156,16 @@ def run_classifier():
         train_accuracy, train_loss = train_epoch(train_CLS_loader, classifier_model, optimizer)
         print(f'Epoch #{epoch+1}: \t train accuracy {train_accuracy:.3f}\t train loss {train_loss:.3f}\t test accuracy {compute_classifier_accuracy(classifier_model, test_CLS_loader):.3f}')
     
-    u = Utilities(tokenizer, classifier_model)
+    # SANITY CHECK
+    print("------------------------SANITY CHECK ENCODER------------------------")   
+    tokenizer = SimpleTokenizer('The man who passes the sentence should swing the sword. If you would take a man\'s life') # create a tokenizer from the data
+    print("Vocabulary size is", tokenizer.vocab_size)   
     
-    print('Running Sanity Checker: ')
-    u.sanity_check('The man who passes the sentence should swing the sword. If you would take a man\'s life, you owe it to him to look into his eyes and hear his final words. And if you cannot bear to do that, then perhaps the man does not deserve to die.', block_size)
+    ec = Classifier(tokenizer.vocab_size)
+    u = Utilities(tokenizer, ec)
     
-            
+    u.sanity_check('The man who passes the sentence should swing the sword. If you would take a man\'s life', block_size)
+    
 # ------------------------------Classifier Code---------------------------------- #
     
     
@@ -217,75 +221,100 @@ def run_decoder():
         test_LM_dataset = LanguageModelingDataset(tokenizer, data,  block_size)
         test_LM_loader = DataLoader(test_LM_dataset, batch_size=batch_size, shuffle=True)
         
-        for i in range(5):
-            print("Iteration", (i+1)*100, file, compute_perplexity(decoder, test_LM_loader))
-            
-    u = Utilities(tokenizer, decoder)
+        print(file, compute_perplexity(decoder, test_LM_loader))
     
-    print('Running Sanity Checker: ')
-    u.sanity_check('The man who passes the sentence should swing the sword. If you would take a man\'s life, you owe it to him to look into his eyes and hear his final words. And if you cannot bear to do that, then perhaps the man does not deserve to die.', block_size)
+    print("------------------------SANITY CHECK DECODER------------------------")
+    tokenizer = SimpleTokenizer('The man who passes the sentence should swing the sword. If you would take a man\'s life') # create a tokenizer from the data
+    print("Vocabulary size is", tokenizer.vocab_size)   
+    
+    ec = Decoder(tokenizer.vocab_size)
+    u = Utilities(tokenizer, ec)
+    
+    u.sanity_check('The man who passes the sentence should swing the sword. If you would take a man\'s life', block_size)
         
 # ------------------------------Decoder Code---------------------------------- #  
 
 
 def run_sanity_check_encoder():
     print("Loading data and creating tokenizer ...")
-    texts = load_texts('speechesdataset')
-    tokenizer = SimpleTokenizer(' '.join(texts)) # create a tokenizer from the data
+    tokenizer = SimpleTokenizer('The man who passes the sentence should swing the sword. If you would take a man\'s life') # create a tokenizer from the data
     print("Vocabulary size is", tokenizer.vocab_size)   
     
     ec = Classifier(tokenizer.vocab_size)
     u = Utilities(tokenizer, ec)
     
-    u.sanity_check('The man who passes the sentence should swing the sword. If you would take a man\'s life, you owe it to him to look into his eyes and hear his final words. And if you cannot bear to do that, then perhaps the man does not deserve to die.', block_size)
+    u.sanity_check('The man who passes the sentence should swing the sword. If you would take a man\'s life', block_size)
     
     
 def run_sanity_check_decoder():
     print("Loading data and creating tokenizer ...")
-    texts = load_texts('speechesdataset')
-    tokenizer = SimpleTokenizer(' '.join(texts)) # create a tokenizer from the data
+    tokenizer = SimpleTokenizer('The man who passes the sentence should swing the sword. If you would take a man\'s life') # create a tokenizer from the data
     print("Vocabulary size is", tokenizer.vocab_size)   
     
     ec = Decoder(tokenizer.vocab_size)
     u = Utilities(tokenizer, ec)
     
-    u.sanity_check('The man who passes the sentence should swing the sword. If you would take a man\'s life, you owe it to him to look into his eyes and hear his final words. And if you cannot bear to do that, then perhaps the man does not deserve to die.', block_size)
+    u.sanity_check('The man who passes the sentence should swing the sword. If you would take a man\'s life', block_size)
 
 
-def run_ec_classifier():
+def run_ec_decoder():
     print("EXTRA CREDIT:")
     texts = load_texts('speechesdataset')
     tokenizer = SimpleTokenizer(' '.join(texts)) # create a tokenizer from the data
-    print("Vocabulary size is", tokenizer.vocab_size)
+    print("Vocabulary size is", tokenizer.vocab_size)   
 
-    train_CLS_dataset = SpeechesClassificationDataset(tokenizer, "speechesdataset/train_CLS.tsv")
-    train_CLS_loader = DataLoader(train_CLS_dataset, batch_size=batch_size, collate_fn=collate_batch, shuffle=True)
+    inputfile = "speechesdataset/train_LM.txt"
+    with open(inputfile, 'r', encoding='utf-8') as f:
+        lmtrainText = f.read()
+    train_LM_dataset = LanguageModelingDataset(tokenizer, lmtrainText,  block_size)
+    train_LM_loader = DataLoader(train_LM_dataset, batch_size=batch_size, shuffle=True)
     
-    test_CLS_dataset = SpeechesClassificationDataset(tokenizer, "speechesdataset/test_CLS.tsv")
-    test_CLS_loader = DataLoader(test_CLS_dataset, batch_size=batch_size, collate_fn=collate_batch, shuffle=True)
+    decoder = DecoderEC(tokenizer.vocab_size, 4, 6)
     
-    classifier_model = ClassifierEC(tokenizer.vocab_size, n_head, 6)
-    
-    total_params = sum(p.numel() for p in classifier_model.parameters())
+    total_params = sum(p.numel() for p in decoder.parameters())
     print("Total number of parameters:", total_params)
+    
+    optimizer = torch.optim.AdamW(decoder.parameters(), lr=learning_rate)
 
-    # Adam optimizer
-    optimizer = torch.optim.Adam(classifier_model.parameters(), lr=0.0001)
-    
-     # for the classification task, you will train for a fixed number of epochs like this:
-    for epoch in range(epochs_CLS):
-        train_accuracy, train_loss = train_epoch(train_CLS_loader, classifier_model, optimizer)
-        print(f'Epoch #{epoch+1}: \t train accuracy {train_accuracy:.3f}\t train loss {train_loss:.3f}\t test accuracy {compute_classifier_accuracy(classifier_model, test_CLS_loader):.3f}')
-    
-    u = Utilities(tokenizer, classifier_model)
-    
-    print('Running Sanity Checker: ')
-    u.sanity_check('The man who passes the sentence should swing the sword. If you would take a man\'s life, you owe it to him to look into his eyes and hear his final words. And if you cannot bear to do that, then perhaps the man does not deserve to die.', block_size)
+    # for the language modeling task, you will iterate over the training data for a fixed number of iterations like this:
+    for i, (xb, yb) in enumerate(train_LM_loader):
+        if i >= max_iters: # stop after 500 batches
+            break
+        xb, yb = xb.to(device), yb.to(device)
+        
+        if (i+1)%100 == 0:
+            print("Train Data Perplexity At Iteration ", (i+1), compute_perplexity(decoder, train_LM_loader))
+        
+        # LM training code here
+        
+        # evaluate the loss
+        logits, _ = decoder(xb)
+        B, T, C = logits.shape
+        
+        logits = logits.view(B*T, C)
+        targets = yb.view(B*T)
+        loss = F.cross_entropy(logits, targets)
+        
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
 
+    # calculate perplexity
+    files = ['speechesdataset/test_LM_hbush.tsv', 'speechesdataset/test_LM_obama.txt', 'speechesdataset/test_LM_wbush.txt']
+    
+    for file in files:
+        with open(file, 'r', encoding='utf-8') as f:
+            data = f.read()
+        test_LM_dataset = LanguageModelingDataset(tokenizer, data,  block_size)
+        test_LM_loader = DataLoader(test_LM_dataset, batch_size=batch_size, shuffle=True)
+        
+        for i in range(5):
+            print("Iteration", (i+1)*100, file, compute_perplexity(decoder, test_LM_loader))
+            
 # ------------------------------MAIN---------------------------------- #  
 def main():
     parser = argparse.ArgumentParser(description="Run classifier or decoder")
-    parser.add_argument("-mode", choices=["c", "d", "sc", "sd", "ecc"], help="Choose mode: 'c' for classifier, 'd' for decoder, 'sc' for sanity checking classifier, 'sd' for sanity checking decoder, 'ecc' for classifier EC")
+    parser.add_argument("-mode", choices=["c", "d", "sc", "sd", "ecd"], help="Choose mode: 'c' for classifier, 'd' for decoder, 'sc' for sanity checking classifier, 'sd' for sanity checking decoder, 'ecd' for decoder EC")
     args = parser.parse_args()
 
     if args.mode == "c":
@@ -296,8 +325,8 @@ def main():
         run_sanity_check_encoder()
     elif args.mode == 'sd':
         run_sanity_check_decoder()
-    elif args.mode == 'ecc':
-        run_ec_classifier()
+    elif args.mode == 'ecd':
+        run_ec_decoder()
     else:
         print("Invalid mode.")
 
