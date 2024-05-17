@@ -224,19 +224,19 @@ def run_decoder():
         print(file, compute_perplexity(decoder, test_LM_loader))
     
     print("------------------------SANITY CHECK DECODER------------------------")
-    tokenizer = SimpleTokenizer('The man who passes the sentence should swing the sword. If you would take a man\'s life') # create a tokenizer from the data
     print("Vocabulary size is", tokenizer.vocab_size)   
     
     ec = Decoder(tokenizer.vocab_size)
     u = Utilities(tokenizer, ec)
     
-    u.sanity_check('The man who passes the sentence should swing the sword. If you would take a man\'s life', block_size)
+    u.sanity_check('With a simple oath, we affirm old traditions and make new beginnings.', block_size)
         
 # ------------------------------Decoder Code---------------------------------- #  
 
 
 def run_sanity_check_encoder():
     print("Loading data and creating tokenizer ...")
+    print("------------------------SANITY CHECK ENCODER------------------------")   
     tokenizer = SimpleTokenizer('The man who passes the sentence should swing the sword. If you would take a man\'s life') # create a tokenizer from the data
     print("Vocabulary size is", tokenizer.vocab_size)   
     
@@ -248,13 +248,13 @@ def run_sanity_check_encoder():
     
 def run_sanity_check_decoder():
     print("Loading data and creating tokenizer ...")
-    tokenizer = SimpleTokenizer('The man who passes the sentence should swing the sword. If you would take a man\'s life') # create a tokenizer from the data
-    print("Vocabulary size is", tokenizer.vocab_size)   
+    texts = load_texts('speechesdataset')
+    tokenizer = SimpleTokenizer(' '.join(texts)) # create a tokenizer from the data
     
     ec = Decoder(tokenizer.vocab_size)
     u = Utilities(tokenizer, ec)
     
-    u.sanity_check('The man who passes the sentence should swing the sword. If you would take a man\'s life', block_size)
+    u.sanity_check('With a simple oath, we affirm old traditions and make new beginnings.', block_size)
 
 
 def run_ec_decoder():
@@ -269,12 +269,12 @@ def run_ec_decoder():
     train_LM_dataset = LanguageModelingDataset(tokenizer, lmtrainText,  block_size)
     train_LM_loader = DataLoader(train_LM_dataset, batch_size=batch_size, shuffle=True)
     
-    decoder = DecoderEC(tokenizer.vocab_size, 4, 6)
+    decoder = DecoderEC(tokenizer.vocab_size, 6, 6)
     
     total_params = sum(p.numel() for p in decoder.parameters())
     print("Total number of parameters:", total_params)
     
-    optimizer = torch.optim.AdamW(decoder.parameters(), lr=learning_rate)
+    optimizer = torch.optim.Adam(decoder.parameters(), lr=2e-3)
 
     # for the language modeling task, you will iterate over the training data for a fixed number of iterations like this:
     for i, (xb, yb) in enumerate(train_LM_loader):
@@ -308,8 +308,7 @@ def run_ec_decoder():
         test_LM_dataset = LanguageModelingDataset(tokenizer, data,  block_size)
         test_LM_loader = DataLoader(test_LM_dataset, batch_size=batch_size, shuffle=True)
         
-        for i in range(5):
-            print("Iteration", (i+1)*100, file, compute_perplexity(decoder, test_LM_loader))
+        print(file, compute_perplexity(decoder, test_LM_loader))
             
 # ------------------------------MAIN---------------------------------- #  
 def main():
