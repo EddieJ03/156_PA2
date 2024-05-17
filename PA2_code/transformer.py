@@ -57,7 +57,6 @@ class MultiHeadAttention(nn.Module):
         out = torch.cat([h(x, attention_maps) for h in self.heads], dim=-1)
         
         if dropout:
-            
             return self.dropout(self.proj(out))
         
         return self.proj(out)
@@ -77,7 +76,6 @@ class FeedFoward(nn.Module):
 
     def forward(self, x, dropout=False):
         if dropout:
-            
             return self.dropout(self.net(x))
         
         return self.net(x)
@@ -181,7 +179,16 @@ class DecoderEC(nn.Module):
         self.blocks = nn.ModuleList([Block(n_embd, n_head=n_head, decoding=True) for _ in range(n_layer)])
         self.ln_f = nn.LayerNorm(n_embd) 
         self.lm_head = nn.Linear(n_embd, vocab_size)
+        self.apply(self._init_weights)
 
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            torch.nn.init.normal_(module.weight, std=0.05)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            torch.nn.init.normal_(module.weight, std=0.05)
+            
     def forward(self, idx):
         B, T = idx.shape
         
@@ -198,4 +205,6 @@ class DecoderEC(nn.Module):
            x = block(x, attention_maps, True) 
            
         x = self.ln_f(x) 
+        
         return self.lm_head(x), attention_maps 
+    

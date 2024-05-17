@@ -269,12 +269,12 @@ def run_ec_decoder():
     train_LM_dataset = LanguageModelingDataset(tokenizer, lmtrainText,  block_size)
     train_LM_loader = DataLoader(train_LM_dataset, batch_size=batch_size, shuffle=True)
     
-    decoder = DecoderEC(tokenizer.vocab_size, 6, 6)
+    decoder = DecoderEC(tokenizer.vocab_size, 4, 6)
     
     total_params = sum(p.numel() for p in decoder.parameters())
     print("Total number of parameters:", total_params)
     
-    optimizer = torch.optim.Adam(decoder.parameters(), lr=2e-3)
+    optimizer = torch.optim.Adam(decoder.parameters(), lr=learning_rate)
 
     # for the language modeling task, you will iterate over the training data for a fixed number of iterations like this:
     for i, (xb, yb) in enumerate(train_LM_loader):
