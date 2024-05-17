@@ -123,19 +123,15 @@ class Encoder(nn.Module):
 
         tok_emb = self.token_embedding_table(idx) 
         
-        odd_i = torch.arange(1, n_embd, 2).float()
-        even_denominator = torch.pow(10000, (odd_i - 1)/n_embd)
-
-        position = torch.arange(block_size, dtype=torch.float).reshape(block_size, 1)
-
-        even_PE = torch.sin(position / even_denominator)
-        odd_PE = torch.cos(position / even_denominator)
-
-        stacked = torch.stack([even_PE, odd_PE], dim=2)
-
-        PE = torch.flatten(stacked, start_dim=1, end_dim=2)
+        # absolute positional encoding  
+        idxs = torch.arange(1, n_embd, 2).float()
         
-        x = tok_emb + PE
+        denominator = torch.pow(10000, (idxs - 1)/n_embd)
+        pos = torch.arange(block_size, dtype=torch.float).reshape(block_size, 1)
+
+        stacked = torch.stack([torch.sin(pos / denominator), torch.cos(pos / denominator)], dim=2)
+        
+        x = tok_emb + torch.flatten(stacked, start_dim=1, end_dim=2)
         
         attention_maps = []
         
@@ -159,20 +155,15 @@ class Decoder(nn.Module):
         
         tok_emb = self.token_embedding_table(idx) 
 
-        even_i = torch.arange(0, n_embd, 2).float()
-        odd_i = torch.arange(1, n_embd, 2).float()
-        even_denominator = torch.pow(10000, (odd_i - 1)/n_embd)
-
-        position = torch.arange(block_size, dtype=torch.float).reshape(block_size, 1)
-
-        even_PE = torch.sin(position / even_denominator)
-        odd_PE = torch.cos(position / even_denominator)
-
-        stacked = torch.stack([even_PE, odd_PE], dim=2)
-
-        PE = torch.flatten(stacked, start_dim=1, end_dim=2)
+        # absolute positional encoding  
+        idxs = torch.arange(1, n_embd, 2).float()
         
-        x = tok_emb + PE 
+        denominator = torch.pow(10000, (idxs - 1)/n_embd)
+        pos = torch.arange(block_size, dtype=torch.float).reshape(block_size, 1)
+
+        stacked = torch.stack([torch.sin(pos / denominator), torch.cos(pos / denominator)], dim=2)
+        
+        x = tok_emb + torch.flatten(stacked, start_dim=1, end_dim=2)
         
         attention_maps = []
         
