@@ -57,7 +57,7 @@ class MultiHeadAttention(nn.Module):
         out = torch.cat([h(x, attention_maps) for h in self.heads], dim=-1)
         
         if dropout:
-            print('DROPOUT')
+            
             return self.dropout(self.proj(out))
         
         return self.proj(out)
@@ -77,7 +77,7 @@ class FeedFoward(nn.Module):
 
     def forward(self, x, dropout=False):
         if dropout:
-            print('DROPOUT')
+            
             return self.dropout(self.net(x))
         
         return self.net(x)
