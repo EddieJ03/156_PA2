@@ -1,4 +1,4 @@
-seed = 40
+seed = 42
 
 """ Hyperparameters to use for training to roughly match 
 the numbers mentioned in the assignment description """

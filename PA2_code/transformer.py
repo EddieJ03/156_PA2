@@ -2,6 +2,7 @@
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
+import math
 
 from constants import block_size, n_embd, n_head, n_layer, n_input, n_output, n_hidden
 
@@ -124,12 +125,11 @@ class Encoder(nn.Module):
         tok_emb = self.token_embedding_table(idx) 
         
         # absolute positional encoding  
-        idxs = torch.arange(1, n_embd, 2).float()
+        div_term = torch.exp(torch.arange(0, n_embd, 2) * (-math.log(10000.0) / n_embd))
         
-        denominator = torch.pow(10000, (idxs - 1)/n_embd)
         pos = torch.arange(block_size, dtype=torch.float).reshape(block_size, 1)
 
-        stacked = torch.stack([torch.sin(pos / denominator), torch.cos(pos / denominator)], dim=2)
+        stacked = torch.stack([torch.sin(pos * div_term), torch.cos(pos * div_term)], dim=2)
         
         x = tok_emb + torch.flatten(stacked, start_dim=1, end_dim=2)
         
@@ -156,12 +156,11 @@ class Decoder(nn.Module):
         tok_emb = self.token_embedding_table(idx) 
 
         # absolute positional encoding  
-        idxs = torch.arange(1, n_embd, 2).float()
+        div_term = torch.exp(torch.arange(0, n_embd, 2) * (-math.log(10000.0) / n_embd))
         
-        denominator = torch.pow(10000, (idxs - 1)/n_embd)
         pos = torch.arange(block_size, dtype=torch.float).reshape(block_size, 1)
 
-        stacked = torch.stack([torch.sin(pos / denominator), torch.cos(pos / denominator)], dim=2)
+        stacked = torch.stack([torch.sin(pos * div_term), torch.cos(pos * div_term)], dim=2)
         
         x = tok_emb + torch.flatten(stacked, start_dim=1, end_dim=2)
         
@@ -188,6 +187,7 @@ class DecoderEC(nn.Module):
         
         tok_emb = self.token_embedding_table(idx) 
 
+        # learned embeddings
         pos_emb = self.position_embedding_table(torch.arange(T))
         
         x = tok_emb + pos_emb 
