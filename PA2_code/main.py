@@ -309,7 +309,11 @@ def run_ec_decoder():
         test_LM_loader = DataLoader(test_LM_dataset, batch_size=batch_size, shuffle=True)
         
         print(file, compute_perplexity(decoder, test_LM_loader))
-            
+        
+    # generate some text!
+    context = torch.zeros((1, 1), dtype=torch.long, device=device)
+    print(tokenizer.decode(decoder.generate(context, max_new_tokens=500)[0].tolist()))
+
 # ------------------------------MAIN---------------------------------- #  
 def main():
     parser = argparse.ArgumentParser(description="Run classifier or decoder")
