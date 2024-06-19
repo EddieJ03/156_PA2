@@ -1,3 +1,5 @@
 transformers
 flask
 torch
+matplotlib
+nltk

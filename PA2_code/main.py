@@ -156,15 +156,8 @@ def run_classifier():
         train_accuracy, train_loss = train_epoch(train_CLS_loader, classifier_model, optimizer)
         print(f'Epoch #{epoch+1}: \t train accuracy {train_accuracy:.3f}\t train loss {train_loss:.3f}\t test accuracy {compute_classifier_accuracy(classifier_model, test_CLS_loader):.3f}')
     
-    # SANITY CHECK
-    print("------------------------SANITY CHECK ENCODER------------------------")   
-    tokenizer = SimpleTokenizer('The man who passes the sentence should swing the sword. If you would take a man\'s life') # create a tokenizer from the data
-    print("Vocabulary size is", tokenizer.vocab_size)   
-    
-    ec = Classifier(tokenizer.vocab_size)
-    u = Utilities(tokenizer, ec)
-    
-    u.sanity_check('The man who passes the sentence should swing the sword. If you would take a man\'s life', block_size)
+    torch.save(classifier_model.state_dict(), 'classifier_model_dict.pth')
+
     
 # ------------------------------Classifier Code---------------------------------- #
     

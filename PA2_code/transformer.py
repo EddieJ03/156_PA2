@@ -118,8 +118,6 @@ class Encoder(nn.Module):
         self.blocks = nn.ModuleList([Block(n_embd, n_head=n_head, decoding=False) for _ in range(n_layer)])
             
     def forward(self, idx):
-        B, T = idx.shape
-
         tok_emb = self.token_embedding_table(idx) 
         
         # absolute positional encoding  
