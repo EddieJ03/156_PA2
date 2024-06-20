@@ -1,5 +1,5 @@
 # Mini President Classifier
-Encoder code to classify speeches between Obama, H. Bush, and W. Bush
+Encoder code to classify speeches between Obama, H. Bush, and W. Bush. Frontend is here: https://mini-president-classifier-fe.vercel.app/
 
 ### How To Run
 `python main.py -mode [c | d | sc | sd | ecd]`
@@ -14,3 +14,4 @@ Encoder code to classify speeches between Obama, H. Bush, and W. Bush
  ### How To Run Docker Container
  - Build Image: `docker build -t <image-name> ./`
  - Run Container: `docker run -d -p 5000:5000 --name mini-pres-classifier <image-name>:latest`
+
