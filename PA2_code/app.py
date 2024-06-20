@@ -3,10 +3,12 @@ from main import load_texts
 from tokenizer import SimpleTokenizer
 from transformer import Classifier
 from constants import block_size
+from flask_cors import CORS
 
 import torch
 
 app = Flask(__name__)
+CORS(app)
 
 # Initialize the model
 texts = load_texts('speechesdataset')

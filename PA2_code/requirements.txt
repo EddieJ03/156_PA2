@@ -3,3 +3,4 @@ flask
 torch
 matplotlib
 nltk
+flask-cors
