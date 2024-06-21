@@ -1,7 +1,12 @@
 # Mini President Classifier
 Encoder code to classify speeches between Obama, H. Bush, and W. Bush. Frontend is here: https://mini-president-classifier-fe.vercel.app/
 
+<<<<<<< Updated upstream
 ### How To Run
+=======
+### How To Train
+
+>>>>>>> Stashed changes
 `python main.py -mode [c | d | sc | sd | ecd]`
 - `c` is for running Part 1 (ALREADY INCLUDES A SANITY CHECK AT END)
 - `d` is for running Part 2 (ALREADY INCLUDES A SANITY CHECK AT END)
