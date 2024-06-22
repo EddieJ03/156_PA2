@@ -19,7 +19,7 @@ def load_model():
 
     # Load the state dictionary
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = torch.load('classifier_model_dict.pth', map_location=device)
+    model.load_state_dict(torch.load('classifier_model_dict.pth', map_location=device))
 
     # Set the model to evaluation mode
     model.eval()
