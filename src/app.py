@@ -10,8 +10,14 @@ import torch
 app = Flask(__name__)
 CORS(app)
 
+block_size = 1024
+
 # Initialize the model
-texts = load_texts('speechesdataset')
+texts = []
+
+for text in load_texts('train.tsv'):
+    texts.append(text)
+    
 tokenizer = SimpleTokenizer(' '.join(texts)) # create a tokenizer from the data
 
 def load_model():
@@ -19,7 +25,7 @@ def load_model():
 
     # Load the state dictionary
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.load_state_dict(torch.load('classifier_model_dict.pth', map_location=device))
+    model.load_state_dict(torch.load('all_pres_classifier_model_dict.pth', map_location=device))
 
     # Set the model to evaluation mode
     model.eval()

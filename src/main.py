@@ -22,20 +22,23 @@ max_iters = 500 # For language modeling, we can process all the batches for the 
 eval_iters = 200  # Number of iterations to evaluate perplexity on the test set
 
 
-def load_texts(directory):
+def load_texts(filename):
     """
     This function loads all texts from the specified directory, ignoring any files with "test" in their name. The text is used for "training" the tokenizer. Since our tokenizer is simple, we don't need to do any training, but we still need to ignore the test data. 
     """
 
-    texts = []
-    files = os.listdir(directory)
-    for filename in files: 
-        if "test" in filename:  ## don't "read test files"
-            continue
-        with open(os.path.join(directory, filename), 'r', encoding='utf-8') as file:
-            texts.append(file.read())
-    return texts
+    # texts = []
+    # files = os.listdir(directory)
+    # for filename in files: 
+    #     if "test" in filename:  ## don't "read test files"
+    #         continue
+    #     with open(os.path.join(directory, filename), 'r', encoding='utf-8') as file:
+    #         texts.append(file.read())
+    # return texts
 
+    with open(filename, 'r', encoding='utf-8') as file:
+        for line in file:
+            yield line.strip()
 
 
 def collate_batch(batch):
@@ -133,30 +136,38 @@ def train_epoch(data_loader, model, optimizer):
 def run_classifier():
 
     print("Loading data and creating tokenizer ...")
-    texts = load_texts('speechesdataset')
+    
+    texts = []
+    
+    for text in load_texts('train.tsv'):
+        texts.append(text)
+        
     tokenizer = SimpleTokenizer(' '.join(texts)) # create a tokenizer from the data
     print("Vocabulary size is", tokenizer.vocab_size)
 
-    train_CLS_dataset = SpeechesClassificationDataset(tokenizer, "speechesdataset/train_CLS.tsv")
-    train_CLS_loader = DataLoader(train_CLS_dataset, batch_size=batch_size, collate_fn=collate_batch, shuffle=True)
-    
-    test_CLS_dataset = SpeechesClassificationDataset(tokenizer, "speechesdataset/test_CLS.tsv")
-    test_CLS_loader = DataLoader(test_CLS_dataset, batch_size=batch_size, collate_fn=collate_batch, shuffle=True)
-    
-    classifier_model = Classifier(tokenizer.vocab_size)
-    
-    total_params = sum(p.numel() for p in classifier_model.parameters())
-    print("Total number of parameters:", total_params)
+    print(len(texts))
+    print(texts[0])
 
-    # Adam optimizer
-    optimizer = torch.optim.Adam(classifier_model.parameters(), lr=learning_rate)
+    # train_CLS_dataset = SpeechesClassificationDataset(tokenizer, "speechesdataset/train_CLS.tsv")
+    # train_CLS_loader = DataLoader(train_CLS_dataset, batch_size=batch_size, collate_fn=collate_batch, shuffle=True)
     
-     # for the classification task, you will train for a fixed number of epochs like this:
-    for epoch in range(epochs_CLS):
-        train_accuracy, train_loss = train_epoch(train_CLS_loader, classifier_model, optimizer)
-        print(f'Epoch #{epoch+1}: \t train accuracy {train_accuracy:.3f}\t train loss {train_loss:.3f}\t test accuracy {compute_classifier_accuracy(classifier_model, test_CLS_loader):.3f}')
+    # test_CLS_dataset = SpeechesClassificationDataset(tokenizer, "speechesdataset/test_CLS.tsv")
+    # test_CLS_loader = DataLoader(test_CLS_dataset, batch_size=batch_size, collate_fn=collate_batch, shuffle=True)
     
-    torch.save(classifier_model.state_dict(), 'classifier_model_dict.pth')
+    # classifier_model = Classifier(tokenizer.vocab_size)
+    
+    # total_params = sum(p.numel() for p in classifier_model.parameters())
+    # print("Total number of parameters:", total_params)
+
+    # # Adam optimizer
+    # optimizer = torch.optim.Adam(classifier_model.parameters(), lr=learning_rate)
+    
+    #  # for the classification task, you will train for a fixed number of epochs like this:
+    # for epoch in range(epochs_CLS):
+    #     train_accuracy, train_loss = train_epoch(train_CLS_loader, classifier_model, optimizer)
+    #     print(f'Epoch #{epoch+1}: \t train accuracy {train_accuracy:.3f}\t train loss {train_loss:.3f}\t test accuracy {compute_classifier_accuracy(classifier_model, test_CLS_loader):.3f}')
+    
+    # torch.save(classifier_model.state_dict(), 'classifier_model_dict.pth')
 
     
 # ------------------------------Classifier Code---------------------------------- #
