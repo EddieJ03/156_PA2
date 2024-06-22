@@ -4,6 +4,8 @@ import torch.nn as nn
 from torch.nn import functional as F
 import math
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 from constants import block_size, n_embd, n_head, n_layer, n_input, n_output, n_hidden
 
 dropout = 0.3
@@ -103,6 +105,15 @@ class Classifier(nn.Module):
         self.fc1 = nn.Linear(input_size, hidden_size)  # First fully connected layer.
         self.fc2 = nn.Linear(hidden_size, n_output)  # Second fully connected layer, outputting three classes.
         self.encoder = Encoder(vocab_size, n_head, n_layer)
+        self.apply(self._init_weights)
+
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
 
     def forward(self, x):
         x, attn_maps = self.encoder(x)
@@ -115,20 +126,32 @@ class Encoder(nn.Module):
     def __init__(self, vocab_size, n_head=n_head, n_layer=n_layer):
         super().__init__()
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
+        self.position_embedding_table = nn.Embedding(block_size, n_embd)
         self.blocks = nn.ModuleList([Block(n_embd, n_head=n_head, decoding=False) for _ in range(n_layer)])
             
     def forward(self, idx):
-        print("idx: ", idx)
-        tok_emb = self.token_embedding_table(idx) 
-        
-        # absolute positional encoding  
-        div_term = torch.exp(torch.arange(0, n_embd, 2) * (-math.log(10000.0) / n_embd))
-        
-        pos = torch.arange(block_size, dtype=torch.float).reshape(block_size, 1)
+        tok_emb = self.token_embedding_table(idx)
 
-        stacked = torch.stack([torch.sin(pos * div_term), torch.cos(pos * div_term)], dim=2)
-        
-        x = tok_emb + torch.flatten(stacked, start_dim=1, end_dim=2)
+        # absolute positional encoding
+        # div_term = torch.exp(torch.arange(0, n_embd, 2) * (-math.log(10000.0) / n_embd))
+
+        # pos = torch.arange(block_size, dtype=torch.float).reshape(block_size, 1)
+
+        # stacked = torch.stack([torch.sin(pos * div_term), torch.cos(pos * div_term)], dim=2)
+
+        # stacked = stacked.to(device)
+
+        pos_emb = self.position_embedding_table(torch.arange(block_size, device=device))
+
+        # stacked = torch.stack([pos_emb, pos_emb], dim=2)
+
+        tok_emb = tok_emb.to(device)
+
+        pos_emb = pos_emb.to(device)
+
+        # x = tok_emb + torch.flatten(stacked, start_dim=1, end_dim=2)
+
+        x = tok_emb + pos_emb
         
         attention_maps = []
         
@@ -182,11 +205,11 @@ class DecoderEC(nn.Module):
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
-            torch.nn.init.normal_(module.weight, std=0.05)
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
             if module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
         elif isinstance(module, nn.Embedding):
-            torch.nn.init.normal_(module.weight, std=0.05)
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
             
     def forward(self, idx):
         B, T = idx.shape

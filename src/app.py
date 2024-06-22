@@ -16,7 +16,7 @@ block_size = 1024
 texts = []
 
 for text in load_texts('train.tsv'):
-    texts.append(text)
+    texts.append(text.split('\t', 1)[1])
     
 tokenizer = SimpleTokenizer(' '.join(texts)) # create a tokenizer from the data
 
