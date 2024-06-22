@@ -3,7 +3,7 @@ seed = 42
 """ Hyperparameters to use for training to roughly match 
 the numbers mentioned in the assignment description """
 batch_size = 16  # Number of independent sequences  we will process in parallel
-block_size = 1024  # Maximum context length for predictions
+block_size = 32  # Maximum context length for predictions
 learning_rate = 1e-3  # Learning rate for the optimizer , OG: 1e-3
 n_embd = 64  # Embedding dimension
 n_head = 2 # Number of attention heads, OG = 2
