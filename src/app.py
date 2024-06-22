@@ -18,7 +18,8 @@ def load_model():
     model = Classifier(tokenizer.vocab_size)
 
     # Load the state dictionary
-    model.load_state_dict(torch.load('classifier_model_dict.pth'))
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = torch.load('model.pth', map_location=device)
 
     # Set the model to evaluation mode
     model.eval()
