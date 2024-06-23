@@ -1,14 +1,24 @@
-from flask import Flask, request, jsonify
+from fastapi import FastAPI, Request
+from pydantic import BaseModel
 from main import load_texts
 from tokenizer import SimpleTokenizer
 from transformer import Classifier
 from constants import block_size
-from flask_cors import CORS
+from fastapi.middleware.cors import CORSMiddleware
+
+import uvicorn
 
 import torch
 
-app = Flask(__name__)
-CORS(app)
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 block_size = 1024
 
@@ -29,19 +39,21 @@ def initialize():
         model.to(device)
         model.eval()
 
-@app.route('/', methods=['GET'])
-def home():
-    return '<h1>Welcome! The server is running! Send a POST request to /predict please.</h1>'
+class TextInput(BaseModel):
+    text: str
 
-@app.route('/predict', methods=['POST'])
-def predict():
+@app.get("/")
+async def home():
+    return {"message": "Welcome! The server is running! Send a POST request to /predict please."}
+
+@app.post("/predict")
+async def predict(request: TextInput):
     global model, tokenizer
     if model is None or tokenizer is None:
         initialize()
         
     # Get the text from the POST request body
-    data = request.json
-    text = data['text']
+    text = request.text
 
     # Perform inference
     with torch.no_grad():
@@ -54,8 +66,5 @@ def predict():
         
     _, predicted = torch.max(output.data, 1)
     
-    return jsonify(predicted.tolist())
+    return {"predicted": predicted.tolist()}
 
-
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000)

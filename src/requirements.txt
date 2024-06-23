@@ -1,8 +1,7 @@
 transformers
-flask
+fastapi
+uvicorn[standard]
 torch
 matplotlib
 nltk
-flask-cors
-gunicorn
-gevent
+uvicorn

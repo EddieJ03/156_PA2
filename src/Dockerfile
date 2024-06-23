@@ -1,17 +1,14 @@
 # Use the official Python image from the Docker Hub
 FROM python:3.12-slim
 
-# Set the working directory in the container
+RUN useradd -m -u 1000 user
+
 WORKDIR /app
 
-# Copy the current directory contents into the container at /app
-COPY . /app
+COPY --chown=user ./requirements.txt requirements.txt
 
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
-# Expose the port the app runs on
-EXPOSE 5000
+COPY --chown=user . /app
 
-# Run app.py when the container launches
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--worker-class","gevent" ,"--workers", "2","--preload", "--timeout", "1200", "app:app"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
