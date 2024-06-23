@@ -26,6 +26,7 @@ def initialize():
         model = Classifier(tokenizer.vocab_size)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.load_state_dict(torch.load('all_pres_classifier_model_dict.pth', map_location=device))
+        model.to(device)
         model.eval()
 
 @app.route('/', methods=['GET'])
@@ -46,7 +47,9 @@ def predict():
     with torch.no_grad():
         wordids = tokenizer.encode(text)
         padded_sentence = wordids[:block_size] + [0] * (block_size - len(wordids))
-        input_tensor = torch.tensor(padded_sentence, dtype=torch.long).unsqueeze(0)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        input_tensor = torch.tensor(padded_sentence, dtype=torch.long).unsqueeze(0).to(device)
+        
         output, _ = model(input_tensor)
         
     _, predicted = torch.max(output.data, 1)
