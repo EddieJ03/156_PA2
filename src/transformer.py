@@ -36,7 +36,7 @@ class Head(nn.Module):
         
         wei = F.softmax(wei, dim=-1) 
         
-        attention_maps.append(wei)
+        # attention_maps.append(wei)
         
         # wei = self.dropout(wei)
         
