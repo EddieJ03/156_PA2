@@ -12,27 +12,21 @@ CORS(app)
 
 block_size = 1024
 
-# Initialize the model
-texts = []
+model = None
+tokenizer = None
 
-for text in load_texts('train.tsv'):
-    texts.append(text.split('\t', 1)[1])
+def initialize():
+    global model, tokenizer
     
-tokenizer = SimpleTokenizer(' '.join(texts)) # create a tokenizer from the data
-
-def load_model():
-    model = Classifier(tokenizer.vocab_size)
-
-    # Load the state dictionary
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model.load_state_dict(torch.load('all_pres_classifier_model_dict.pth', map_location=device))
-
-    # Set the model to evaluation mode
-    model.eval()
-    
-    return model
-
-model = load_model()
+    if not tokenizer:
+        texts = [text.split('\t', 1)[1] for text in load_texts('train.tsv')]
+        tokenizer = SimpleTokenizer(' '.join(texts))
+        
+    if not model:
+        model = Classifier(tokenizer.vocab_size)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model.load_state_dict(torch.load('all_pres_classifier_model_dict.pth', map_location=device))
+        model.eval()
 
 @app.route('/', methods=['GET'])
 def home():
@@ -40,6 +34,10 @@ def home():
 
 @app.route('/predict', methods=['POST'])
 def predict():
+    global model, tokenizer
+    if model is None or tokenizer is None:
+        initialize()
+        
     # Get the text from the POST request body
     data = request.json
     text = data['text']
