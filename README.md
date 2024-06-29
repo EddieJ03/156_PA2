@@ -3,7 +3,7 @@ Encoder code to classify speeches between all presidents. Frontend is here: http
  
 HuggingFace Space: https://huggingface.co/spaces/edwjin/docker-classifier
 
-Training done on a Google Colab (for that free TPU): https://colab.research.google.com/drive/14pmqM5cEvhWum4bPCvuzbgQe2u5iGPze
+Training done on a Google Colab (for that free TPU): https://colab.research.google.com/drive/15NDeBQ0AsHys_8Hbp1S81auwyJGGWw8M
 
 Still working on ways to improve it!
 
